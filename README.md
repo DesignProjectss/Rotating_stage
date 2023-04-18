@@ -1,2 +1,3 @@
 # Welcome to the world of Projects
-spectrum stopped by
+# this doc details everything about the stage manager
+# -the stage rotation, -the stage lightning
