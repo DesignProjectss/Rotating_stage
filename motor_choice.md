@@ -8,4 +8,4 @@ The combination of a stepper motor and a rotary encoder allows for accurate and 
 
 The choice of power supply could be DC ior AC.
 
-more about closed-loop stepper motor: https://www.orientalmotor.com/stepper-motors/closed-loop-stepper-motors.html
+Article about closed-loop stepper motor vs servo motor: https://www.linearmotiontips.com/how-does-closed-loop-stepper-control-work/
