@@ -10,7 +10,7 @@ import ntptime
 from delay_ms import Delay_ms
 import ulogger
 
-from config import SCENARIOS, PINS
+from config import TRANSITIONS, STATES, PINS
 
 class Clock(ulogger.BaseClock):
     def __init__(self):
@@ -99,7 +99,7 @@ class Transition(object):
     """ The class used to wrap condition checks. Can be replaced to alter condition resolution behaviour
         (e.g. OR instead of AND for 'conditions' or AND instead of OR for 'unless') """
 
-    def __init__(self, model, conditions=None, unless=None, before=None,
+    def __init__(self, source=None, dest=None, conditions=None, unless=None, before=None,
                  after=None, prepare=None):
         """
         Args:
@@ -117,11 +117,9 @@ class Transition(object):
             after (optional[str, callable or list]): callbacks to trigger after the transition.
             prepare (optional[str, callable or list]): callbacks to trigger before conditions are checked
         """
-        self.model = model
-        #self.source = self.model.state.name if self.model.state else None
-        self.dest = None
-
-        self.idx = 0 if self.model.loop_includes_initial else 1
+        self.source = source
+        
+        self.dest = dest
 
         self.prepare = [self._check_source_dest]
         self.before = [self._check_allowed_states]
@@ -152,11 +150,6 @@ class Transition(object):
         """
         #self.source = self.model.state.name if self.model.state else None
 
-        if self.model.ordered_transition:
-            self._ordered_transitions()
-        _LOGGER.info("{} on {} Initiating transition from state {} to state {}...".format(
-                      self.model.name, machine.name, self.model.state.name, self.dest))
-
         machine.callbacks(self.prepare)
         _LOGGER.debug("{} Executed callbacks before conditions.".format(self.model.name, machine.name))
 
@@ -176,47 +169,13 @@ class Transition(object):
     def _change_state(self, machine):
         machine.go_to_state(self.model, self.dest)
 
-    def _change_linked_state(self, machine):
-        pass
-
     def _check_source_dest(self):
-        if self.model.state.name == self.dest:
+        if self.source == self.dest:
             self.dest = None
 
     def _check_allowed_states(self):
-        if not self.dest in self.model.states.keys():
+        if not self.dest in STATES.keys():
             self.dest = None
-
-    def _ordered_transitions(self):
-        """ Add a set of transitions that move linearly from state to state.
-        Args:
-            states (list): A list of state names defining the order of the
-                transitions. E.g., ['A', 'B', 'C'] will generate transitions
-                for A --> B, B --> C, and C --> A (if loop is True). If states
-                is None, all states in the current instance will be used.
-            loop (boolean): Whether to add a transition from the last
-                state to the first state.
-            loop_includes_initial (boolean): If no initial state was defined in
-                the machine, setting this to True will cause the _initial state
-                placeholder to be included in the added transitions. This argument
-                has no effect if the states argument is passed without the
-                initial state included.
-        """
-        states = self.model.ordered_states
-        loop = self.model.loop
-
-        len_transitions = len(states)
-        if len_transitions < 2:
-            raise ValueError("Can't create ordered transitions on a Machine "
-                             "with fewer than 2 states.")
-
-        try:
-            self.dest = states[self.idx]
-            self.idx += 1
-        except IndexError:
-            self.idx = 0 if loop else -1 # stay in the last state or go to the first
-            self.dest = states[self.idx]
-            self.idx = 1 if self.idx == 0 else -1
 
     def add_callback(self, trigger, func):
         """ Add a new before, after, or prepare callback.
@@ -256,16 +215,37 @@ class State(object):
         self._location = value
 
     def enter(self, machine):
-        _LOGGER.info("Entering state {}".format(model.state.name))
-
-        #read actions to be taken from scenarios
+        _LOGGER.info("Entering state {}".format(machine.model.current_state.name))
         
         machine.model.rotate()
+        #read actions to be taken from STATE
+        for fn in STATES[self.name]['on_enter']:
+            if isinstance(fn, dict): # it contains the fn name as key and args as values
+                fn_name, fn_args = fn.items()
+                cls_name, met_name = fn_name.split('_', 1)
+                getattr(cls_name, met_name)(fn_args) # make sure the fn takes *args and **kwargs
+            elif isinstance(fn, str):
+                fn_name, fn_args = fn.items()
+                cls_name, met_name = fn_name.split('_', 1)
+                getattr(cls_name, met_name)() # make sure the fn takes *args and **kwargs
+        
+        
 
     def exit(self, machine):
-        _LOGGER.info("Exiting state {}".format(model.state.name))
+        _LOGGER.info("Exiting state {}".format(machine.model.current_state.name))
         
-        #read actions to be taken from scenarios
+        machine.model.close_curtain()
+        #read actions to be taken from STATE
+        for fn in STATES[self.name]['on_exit']:
+            if isinstance(fn, dict): # it contains the fn name as key and args as values
+                fn_name, fn_args = fn.items()
+                cls_name, met_name = fn_name.split('_', 1)
+                getattr(cls_name, met_name)(fn_args) # make sure the fn takes *args and **kwargs
+            elif isinstance(fn, str):
+                fn_name, fn_args = fn.items()
+                cls_name, met_name = fn_name.split('_', 1)
+                getattr(cls_name, met_name)() # make sure the fn takes *args and **kwargs
+        
 
     def update(self, machine): #runs updates globally for all states entered
         pass
@@ -277,27 +257,25 @@ class StateMachine(object):
 
     transition_cls = Transition
 
-    transitions = []
-
     delay = Delay_ms()
 
     gpios = PINS['GPIO_POOL']
     
-    divisions = len(SCENARIOS)
+    divisions = len(STATES)
     
-    initial_state = 'Scene_1'
-
     def __init__(self):
-        
+                
         self.model = Platform(self.divisions)
         
-        self.go_to_state(initial_state)
-
-        self.delay.callback(self._run_transitions, ())
-
-        self._create_transition(self)
+        self.delay.callback(self._run_transitions, ()) #register the callback with the timer
         
-        self.delay.trigger()
+        self.transitions_time = 0
+
+        self.transition_generator = self._create_transition()
+        
+        self.transition = next(self.transition_generator)
+        
+        self.delay.trigger(self.transitions_time) #transition immediately
 
     @staticmethod
     def _add_pins(model, states, number_of_bulbs):
@@ -307,15 +285,32 @@ class StateMachine(object):
         del StateMachine.gpios[:number_of_bulbs]
 
     @classmethod
-    def _create_transition(cls, self, conditions=None, unless=None, before=None, after=None, prepare=None):
-        for model in self.models.values():
-            cls.transitions.append(cls.transition_cls(model, conditions, unless, before, after, prepare))
+    def _create_transition(cls):
+        for i in range(len(TRANSITIONS)):
+            trans = TRANSITIONS.popitem(False)
+            
+            state_name = trans[0]
+            
+            self.transition_time = trans[1]['transition_time']
+            conditions = trans[1]['conditions']
+            unless = trans[1]['unless']
+            before = trans[1]['before']
+            after = trans[1]['after']
+            prepare = trans[1]['prepare']
+            
+            yield cls.transition_cls(self, conditions, unless, before, after, prepare)
+        
 
     def _run_transitions(self):
-        for transition in self.transitions:
-            transition.execute(self)
-        self.delay.trigger(self.state_allotted_time)
-        _LOGGER.info(f"There will be transition in: {self.state_allotted_time}ms")
+        self.transition.execute(self)
+        _LOGGER.info(f"There will be transition in: {self.transition_time}ms")
+        
+        try:
+            self.transition = next(self.transition_generator)
+        except StopIteration:
+            pass # kill the machine or something
+        
+        self.delay.trigger(self.transition_time) #when is the next transition?
 
     def go_to_state(self, state_name):
         if self.model.current_state:
@@ -359,9 +354,9 @@ class Platform():
     def rotate(self):
         location_diff = self.current_state.location - self.old_state.location
         if abs(location_diff) > 180: #find the shortest path for energy conservation
-            self.rotateCW(location_diff)
-        else:
             self.rotateCCW(location_diff)
+        else:
+            self.rotateCW(location_diff)
             
         # disable the motor to conserve energy
     
@@ -369,6 +364,15 @@ class Platform():
         pass
 
     def rotateCW(self):
+        pass
+    
+    def close_curtain():
+        pass
+    
+    def open_curtain():
+        pass
+    
+    def open_curtain_to(width):
         pass
     
 

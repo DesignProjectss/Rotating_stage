@@ -1,32 +1,29 @@
 from collections import OrderedDict
 
-SCENARIOS = OrderedDict([
+STATES = OrderedDict([
             (
                 'Scene_1',
-                    [
-                        {
-                            'initial_state': True, #this can be derived from the dividers
-                            'transition_time':10,
-                            'effects_on_enter':['light_fade_in', 
-                                       'light_fade_out',
-                                       'animal_sound'
-                                      ],
-                            'effects_on_exit':['draw_curtain'],
-                            'effects_after': {'10':'flicker_light'},
-                            'transition_event': 'listen_for_cues',
-                            'priority': ['transition_event', 'transition_time'],
-                            'response_speed': 'standard'
-                            'record': ['video', 'audio']
-                        
-                        }
-                    ]
+                    
+                    {
+                        'on_enter':['light_fade_in', 
+                                   'light_fade_out',
+                                   'animal_sound'
+                                  ],
+                        'on_exit':['draw_curtain']
+
+                    }
+
             ),
 
             (
                 'Scene_2',
 
                     {
-                        'initial_state': False
+                        'on_enter':['light_fade_in', 
+                                       'light_fade_out',
+                                       'animal_sound'
+                                      ],
+                        'on_exit':['draw_curtain']
                     }
 
 
@@ -36,7 +33,11 @@ SCENARIOS = OrderedDict([
                 'Scene_3',
 
                     {
-                        'initial_state': False
+                        'on_enter':['light_fade_in', 
+                                       'light_fade_out',
+                                       'animal_sound'
+                                      ],
+                        'on_exit':['draw_curtain']
                     }
 
 
@@ -46,13 +47,45 @@ SCENARIOS = OrderedDict([
                 'Scene_4',
 
                     {
-                        'initial_state': False
+                        'on_enter':['light_fade_in', 
+                                       'light_fade_out',
+                                       'animal_sound'
+                                      ],
+                        'on_exit':['draw_curtain']
                     }
 
 
             )
 
 ])
+
+TRANSITIONS = OrderedDict([
+            (
+                'Scene_1', 
+                    {
+                        'transition_time': 5,
+                        'prepare': [],
+                        'unless': []
+                        'before': ['draw_curtain'],
+                        'after': {'10':'flicker_light'},
+                        'condition': [{'listen_for_cues':20}], #wait for the event to happen before eventually transitioning
+                        
+                    }
+                
+            ),
+    
+            (
+                
+                
+            ),
+    
+            (
+                
+                
+            ),
+
+])
+
 
 
 PINS = OrderedDict([
