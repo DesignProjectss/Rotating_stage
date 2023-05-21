@@ -41,6 +41,7 @@ The other port is connected to the serial code of the app
 
 ## STDIO to PTY or TCP
 - socat STDIO /dev/pts/3,raw,echo=0,crlf
+- socat STDIO TCP4:localhost:7778
 
 ## Create a network between the server and the client using zerotier
 - https://docs.zerotier.com/getting-started/getting-started/
