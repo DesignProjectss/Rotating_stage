@@ -2,6 +2,6 @@ Procedure for remote communication:
 -server creates network through Zerotier
 -client join network using ip address 
 -client creates virtual port pair(COM7 and COM8-in loopback mode), one connected to blender(COM8) through pyserial, the other connected to the network using tcp(COM7)(power shell on windows-
-cd D:, then path/directory of the tcp2.bat: D:\Downloads\hub4com-2.1.0.0-386\hub4com-2.1.0.0-386, then com2tcp-rfc2217 \\.\COM7 10.147.19.112 7778)
+cd D:, then path/directory of the tcp2.bat: D:\Downloads\hub4com-2.1.0.0-386\hub4com-2.1.0.0-386, then .\com2tcp-rfc2217 \\.\COM7 10.147.19.112 7778)
 -comm set
 -you can now read and write to the ports across the network
