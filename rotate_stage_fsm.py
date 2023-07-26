@@ -11,6 +11,7 @@ from delay_ms import Delay_ms
 import ulogger
 
 from config import TRANSITIONS, STATES, PINS
+from motor import Motor
 
 class Clock(ulogger.BaseClock):
     def __init__(self):
@@ -331,6 +332,7 @@ class Platform():
 
     def __init__(self, divisions):
         self.divisions = divisions
+        self.motor = Motor()
         self.old_state = State(name='Scene_0', location=0)
         self.current_state = None
         self.states = {}
@@ -351,20 +353,25 @@ class Platform():
             raise ValueError("divisions can only take any value from 2,3 and 4")
         self._divisions = value
         
+    def calibrate(self, reverse=False): # Just to set our motor to first division(state 1) facing us
+        self.motor.move_one_step(reverse)
+    
     def rotate(self):
         location_diff = self.current_state.location - self.old_state.location
         if abs(location_diff) > 180: #find the shortest path for energy conservation
-            self.rotateCCW(location_diff)
+            # self.rotateCCW(location_diff)
+            self.motor.rotate_by(location_diff, reverse=True)
         else:
-            self.rotateCW(location_diff)
+            self.motor.rotate_by(location_diff)
+            # self.rotateCW(location_diff)
             
         # disable the motor to conserve energy
     
-    def rotateCCW(self):
-        pass
+    # def rotateCCW(self):
+    #     pass
 
-    def rotateCW(self):
-        pass
+    # def rotateCW(self):
+    #     pass
     
     def close_curtain():
         pass
