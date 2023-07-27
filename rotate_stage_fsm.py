@@ -1,49 +1,61 @@
 
 #from micropython import const
-from machine import Pin
+# from machine import Pin
 import sys
 from collections import OrderedDict
 import uasyncio as asyncio
-from machine import RTC
 import ntptime
 
 from delay_ms import Delay_ms
-import ulogger
 
-from config import TRANSITIONS, STATES, PINS
+import os
 
-class Clock(ulogger.BaseClock):
-    def __init__(self):
-        self.rtc = RTC()
-        ntptime.host = "ntp.ntsc.ac.cn"
-        #ntptime.settime()
+from motor import Motor
 
-    def __call__(self) -> str:
-        y,m,d,_,h,mi,s,_ = self.rtc.datetime ()
-        return '%d-%d-%d %d:%d:%d' % (y,m,d,h,mi,s)
+if os.name != 'posix':
+    from primitives import Delay_ms, Semaphore
+    from machine import RTC
+    import ulogger
     
-clock = Clock()
+    class Clock(ulogger.BaseClock):
+        def __init__(self):
+            self.rtc = RTC()
+            ntptime.host = "ntp.ntsc.ac.cn"
+            #ntptime.settime()
 
-handlers = (
-    ulogger.Handler(
-        level=ulogger.INFO,
-        colorful=True,
-        fmt="&(time)% - &(level)% - &(name)% - &(fnname)% - &(msg)%",
-        clock=clock,
-        direction=ulogger.TO_TERM,
-    ),
-    ulogger.Handler(
-        level=ulogger.ERROR,
-        fmt="&(time)% - &(level)% - &(name)% - &(fnname)% - &(msg)%",
-        clock=clock,
-        direction=ulogger.TO_FILE,
-        file_name="logging.log",
-        max_file_size=2048 # max for 2k
+        def __call__(self) -> str:
+            y,m,d,_,h,mi,s,_ = self.rtc.datetime ()
+            return '%d-%d-%d %d:%d:%d' % (y,m,d,h,mi,s)
+    
+    clock = Clock()
+
+    handlers = (
+        ulogger.Handler(
+            level=ulogger.INFO,
+            colorful=True,
+            fmt="&(time)% - &(level)% - &(name)% - &(fnname)% - &(msg)%",
+            clock=clock,
+            direction=ulogger.TO_TERM,
+        ),
+        ulogger.Handler(
+            level=ulogger.ERROR,
+            fmt="&(time)% - &(level)% - &(name)% - &(fnname)% - &(msg)%",
+            clock=clock,
+            direction=ulogger.TO_FILE,
+            file_name="logging.log",
+            max_file_size=2048 # max for 2k
+        )
     )
-)
 
-_LOGGER = ulogger.Logger(__name__, handlers)
+    _LOGGER = ulogger.Logger(__name__, handlers)
+# except ImportError:
+#     pass
 
+
+from scenarios import TRANSITIONS, STATES, PINS
+
+
+AUTOMATION = True
 
 class Condition(object):
     """ A helper class to call condition checks in the intended way.
@@ -100,7 +112,7 @@ class Transition(object):
         (e.g. OR instead of AND for 'conditions' or AND instead of OR for 'unless') """
 
     def __init__(self, source=None, dest=None, conditions=None, unless=None, before=None,
-                 after=None, prepare=None):
+                 after=None, prepare=None, on_enter_state=None, on_exit_state=None):
         """
         Args:
             source (str): The name of the source State.
@@ -124,20 +136,26 @@ class Transition(object):
         self.prepare = [self._check_source_dest]
         self.before = [self._check_allowed_states]
         self.after = []
+        
+        self.on_enter_state = on_enter_state
+        self.on_exit_state= on_exit_state
 
         self.conditions = []
         if conditions is not None:
-            for cond in listify(conditions):
+            for cond in conditions:
                 self.conditions.append(self.condition_cls(cond))
         if unless is not None:
-            for cond in listify(unless):
+            for cond in unless:
                 self.conditions.append(self.condition_cls(cond, target=False))
+                
+        self.add_callback('prepare', prepare)
+        self.add_callback('before', before)
+        self.add_callback('after', after)
 
     def _eval_conditions(self, machine):
         for cond in self.conditions:
             if not cond.check(machine):
-                _LOGGER.debug("%s Transition condition failed: %s() does not return %s. Transition halted.",
-                              machine.name, cond.func, cond.target)
+                #_LOGGER.debug("%s Transition condition failed: %s() does not return %s. Transition halted.",machine.name, cond.func, cond.target)
                 return False
         return True
 
@@ -151,23 +169,31 @@ class Transition(object):
         #self.source = self.model.state.name if self.model.state else None
 
         machine.callbacks(self.prepare)
-        _LOGGER.debug("{} Executed callbacks before conditions.".format(self.model.name, machine.name))
+        #_LOGGER.debug("{} Executed callbacks before conditions.".format(machine.name))
 
         if not self._eval_conditions(machine):
             return False
 
         machine.callbacks(self.before)
-        _LOGGER.debug("{} Executed callback before transition.".format(self.model.name, machine.name))
+        #_LOGGER.debug("{} Executed callback before transition.".format(machine.name))
 
         if self.dest:  # if self.dest is None this is an internal transition with no actual state change
             self._change_state(machine)
 
         machine.callbacks(self.after)
-        _LOGGER.debug("{} Executed callback after transition.".format(self.model.name, machine.name))
+        #_LOGGER.debug("{} Executed callback after transition.".format(machine.name))
+        # print(machine.model.current_state.name)
+        machine.model.rotate()
+        
+        self.add_state_callback(machine, 'on_enter', self.on_enter_state)
+        
+        self.add_state_callback(machine, 'on_exit', self.on_exit_state)
+        
         return True
 
     def _change_state(self, machine):
-        machine.go_to_state(self.model, self.dest)
+        
+        machine.go_to_state(self.dest)
 
     def _check_source_dest(self):
         if self.source == self.dest:
@@ -182,14 +208,37 @@ class Transition(object):
         Args:
             trigger (str): The type of triggering event. Must be one of
                 'before', 'after' or 'prepare'.
-            func (str or callable): The name of the callback function or a callable.
+            func (str or callable or list): The name of the callback function or a callable.
         """
         callback_list = getattr(self, trigger)
-        callback_list.append(func)
+        if isinstance(func, list):
+            callback_list.extend(func)
+        elif isinstance(func, dict):
+            pass#turn a dictionary key to a callable with the value(s) as the argument
+        else:
+            callback_list.append(func)
+            
+            
+    def add_state_callback(self, machine, trigger, func):
+        """ Add a new on_enter and on_exit callback.
+        Args:
+            trigger (str): The type of triggering event. Must be one of
+                'on_exit', 'on_before'.
+            func (str or callable or list): The name of the callback function or a callable.
+        """
+        callback_list = getattr(machine.model.current_state, trigger)
+        
+        if isinstance(func, list):
+            callback_list.extend(func)
+        elif isinstance(func, dict):
+            pass#turn a dictionary key to a callable with the value(s) as the argument
+        else:
+            callback_list.append(func)
+            
 
     def __repr__(self):
         return "<%s('%s', '%s')@%s>" % (type(self).__name__,
-                                        self.model.state.name, self.dest, id(self))
+                                        self.source, self.dest, id(self))
 
 #abstract state base class
 class State(object):
@@ -197,6 +246,8 @@ class State(object):
     def __init__(self, name, location):
         self.name = name
         self.location = location
+        self.on_enter = STATES[self.name]['on_enter']
+        self.on_exit = STATES[self.name]['on_exit']
 
     @property
     def name(self):
@@ -215,130 +266,68 @@ class State(object):
         self._location = value
 
     def enter(self, machine):
-        _LOGGER.info("Entering state {}".format(machine.model.current_state.name))
+        #_LOGGER.info("Entering state {}".format(machine.model.current_state.name))
         
-        machine.model.rotate()
+        # machine.model.rotate()
         #read actions to be taken from STATE
-        for fn in STATES[self.name]['on_enter']:
+        for fn in self.on_enter:
             if isinstance(fn, dict): # it contains the fn name as key and args as values
                 fn_name, fn_args = fn.items()
-                cls_name, met_name = fn_name.split('_', 1)
-                getattr(cls_name, met_name)(fn_args) # make sure the fn takes *args and **kwargs
+                func = machine.resolve_callable(fn_name)
+                func(fn_args)
             elif isinstance(fn, str):
-                fn_name, fn_args = fn.items()
-                cls_name, met_name = fn_name.split('_', 1)
-                getattr(cls_name, met_name)() # make sure the fn takes *args and **kwargs
+                func = machine.resolve_callable(fn)
+                func()
         
         
 
     def exit(self, machine):
-        _LOGGER.info("Exiting state {}".format(machine.model.current_state.name))
+        #_LOGGER.info("Exiting state {}".format(machine.model.current_state.name))
         
-        machine.model.close_curtain()
+        # machine.model.close_curtain()
         #read actions to be taken from STATE
-        for fn in STATES[self.name]['on_exit']:
+        for fn in self.on_exit:
             if isinstance(fn, dict): # it contains the fn name as key and args as values
                 fn_name, fn_args = fn.items()
-                cls_name, met_name = fn_name.split('_', 1)
-                getattr(cls_name, met_name)(fn_args) # make sure the fn takes *args and **kwargs
+                func = machine.resolve_callable(fn_name)
+                func(fn_args)
+                # cls_name, met_name = fn_name.split('_', 1)
+                # getattr(cls_name, met_name)(fn_args) # make sure the fn takes *args and **kwargs
             elif isinstance(fn, str):
-                fn_name, fn_args = fn.items()
-                cls_name, met_name = fn_name.split('_', 1)
-                getattr(cls_name, met_name)() # make sure the fn takes *args and **kwargs
-        
+                func = machine.resolve_callable(fn)
+                func()
+               
 
     def update(self, machine): #runs updates globally for all states entered
         pass
 
-#state machine class
-class StateMachine(object):
-
-    name = 'Platform Rotation System'
-
-    transition_cls = Transition
-
-    delay = Delay_ms()
-
-    gpios = PINS['GPIO_POOL']
     
-    divisions = len(STATES)
-    
-    def __init__(self):
-                
-        self.model = Platform(self.divisions)
-        
-        self.delay.callback(self._run_transitions, ()) #register the callback with the timer
-        
-        self.transitions_time = 0
-
-        self.transition_generator = self._create_transition()
-        
-        self.transition = next(self.transition_generator)
-        
-        self.delay.trigger(self.transitions_time) #transition immediately
-
-    @staticmethod
-    def _add_pins(model, states, number_of_bulbs):
-        for pin, state_name in enumerate(states[:number_of_bulbs]):
-            #print(StateMachine.gpios[pin])
-            model.gpios[state_name.split('_')[0]] = Pin(StateMachine.gpios[pin], Pin.OUT)
-        del StateMachine.gpios[:number_of_bulbs]
-
-    @classmethod
-    def _create_transition(cls):
-        for i in range(len(TRANSITIONS)):
-            trans = TRANSITIONS.popitem(False)
-            
-            state_name = trans[0]
-            
-            self.transition_time = trans[1]['transition_time']
-            conditions = trans[1]['conditions']
-            unless = trans[1]['unless']
-            before = trans[1]['before']
-            after = trans[1]['after']
-            prepare = trans[1]['prepare']
-            
-            yield cls.transition_cls(self, conditions, unless, before, after, prepare)
-        
-
-    def _run_transitions(self):
-        self.transition.execute(self)
-        _LOGGER.info(f"There will be transition in: {self.transition_time}ms")
-        
-        try:
-            self.transition = next(self.transition_generator)
-        except StopIteration:
-            pass # kill the machine or something
-        
-        self.delay.trigger(self.transition_time) #when is the next transition?
-
-    def go_to_state(self, state_name):
-        if self.model.current_state:
-            _LOGGER.debug('Exiting {}'.format(self.model.current_state.name))
-            self.model.old_state = self.model.current_state
-            self.model.current_state.exit(self)
-            
-        self.model.current_state = self.model.states[state_name] 
-        _LOGGER.debug('Entering {}'.format(self.model.current_state.name))
-        self.model.current_state.enter(self)# the machine instance has been passed in
-
-    async def update(self):
-        await asyncio.sleep_ms(1)
-        self.model.state.update(self)
-
-
 class Platform():
 
     def __init__(self, divisions):
         self.divisions = divisions
-        self.old_state = State(name='Scene_0', location=0)
-        self.current_state = None
+        self.motor = Motor()
+        self.old_state = None #State(name='Scene_0', location=0)
+        self.current_state = State(name='Scene_0', location=0) #None
         self.states = {}
-        self.locations = {2: [90, 270], 3: [45, 135, 270], 4: [45, 135, 225, 315]}
-
-        for i in range(1, divisions+1):
-            locations = self.locations[divisions]
-            self.states[f'Scene_{i}'] = State(name=f'Scene_{i}', location=locations[i])
+        # self.locations = {2: [90, 270], 3: [45, 135, 270], 4: [45, 135, 225, 315]}
+        self.locations = [(360//int(self.divisions))*i for i in range(1,int(self.divisions)+1)]
+        
+        self.locations.insert(0, 0)
+        
+        print(self.locations) #added the dummy Scene_0
+        
+        for i in range(0, self.divisions+1): 
+            self.states[f'Scene_{i}'] = State(name=f'Scene_{i}', location=self.locations[i])
+            
+        if AUTOMATION:
+            import serial
+            self.platform = serial.Serial('/dev/pts/2',115200) #remember to change the port number
+            
+        self.start_motor()
+            
+    def start_motor(self):
+        pass
                         
     @property
     def divisions(self):
@@ -350,9 +339,15 @@ class Platform():
         if value not in [2,3,4]:
             raise ValueError("divisions can only take any value from 2,3 and 4")
         self._divisions = value
-        
+
+    def calibrate(self, reverse):
+        self.motor.move_one_step(reverse)
+
     def rotate(self):
+        # print([state.location for state in self.states.values()])
+        print(self.current_state.location, self.old_state.location)
         location_diff = self.current_state.location - self.old_state.location
+        print(location_diff)
         if abs(location_diff) > 180: #find the shortest path for energy conservation
             self.rotateCCW(location_diff)
         else:
@@ -360,27 +355,168 @@ class Platform():
             
         # disable the motor to conserve energy
     
-    def rotateCCW(self):
-        pass
+    def rotateCCW(self, diff):
+        if AUTOMATION:
+            data = {'angle':360//self.divisions, 'division':self.divisions, 'rotate':diff}
+            self.platform.write(f"{data}\n")
+        else:
+            self.motor.rotate_by(abs(diff), reverse=True)
+            
+    def rotateCW(self, diff):
+        if AUTOMATION:
+            data = {'angle':360//self.divisions, 'division':self.divisions, 'rotate':diff}
+            self.platform.write(f"{data}\n")
+        else:
+            self.motor.rotate_by(diff)
+    
+#state machine class
+class StateMachine(object):
 
-    def rotateCW(self):
-        pass
-    
-    def close_curtain():
-        pass
-    
-    def open_curtain():
-        pass
-    
-    def open_curtain_to(width):
-        pass
-    
+    name = 'Platform Rotation System'
 
-class Lamps():
-
-    def __init__(self):
-        pass
+    transition_cls = Transition
     
+    # model = Platform
+
+    gpios = PINS['GPIO_POOL']
+    
+    divisions = len(STATES)
+    
+    def __init__(self, plat_div):
+                
+        self.model = Platform(plat_div)
+        
+        self.delay = Delay_ms(self._run_transitions, ())
+                        
+        self.transition_generator = self._create_transition()
+        
+        self.transition_time, self.transition = next(self.transition_generator)
+        
+        print(self.transition_time)
+        
+        print(self.transition)
+        
+        self.delay.trigger(self.transition_time)
+
+    @staticmethod
+    def _add_pins(model, states, number_of_bulbs):
+        for pin, state_name in enumerate(states[:number_of_bulbs]):
+            #print(StateMachine.gpios[pin])
+            model.gpios[state_name.split('_')[0]] = Pin(StateMachine.gpios[pin], Pin.OUT)
+        del StateMachine.gpios[:number_of_bulbs]
+
+    # @classmethod
+    def _create_transition(self):
+        for key in TRANSITIONS.keys():
+            trans = TRANSITIONS.get(key)
+            
+            state_name = key
+            
+            transition_time = trans['transition_time']
+            
+            #for conditions and unless to work, we might need to consider the use of an asyn queue instead of generator.
+            conditions = trans['conditions']
+            unless = trans['unless']
+            
+            before = trans['before']
+            after = trans['after']
+            prepare = trans['prepare']
+            
+            on_enter = trans['on_enter']
+            on_exit = trans['on_exit']
+            
+            yield transition_time, self.transition_cls(self.model.current_state.name, state_name, conditions, unless, before, after, prepare, on_enter, on_exit) # how to put an obj back into the generator in the case a condition fails?  Use the queue instead
+
+    def _run_transitions(self):
+        condition = self.transition.execute(self)
+        #_LOGGER.info(f"There will be transition in: {self.transition_time}ms")
+        if condition:
+            try:
+                self.transition_time, self.transition = next(self.transition_generator)
+                print(self.transition_time)
+                print(self.transition)
+                self.delay.trigger(self.transition_time)
+            except StopIteration:
+                self.delay.stop() # kill the machine or something
+        else:
+            self.trigger(5000) # in case the condition fails, try it again every 5 mins until it passes.
+        
+    def go_to_state(self, state_name):
+        if self.model.current_state:
+            #_LOGGER.debug('Exiting {}'.format(self.model.current_state.name))
+            self.model.old_state = self.model.current_state
+            self.model.current_state.exit(self)
+            
+        self.model.current_state = self.model.states[state_name] 
+        #_LOGGER.debug('Entering {}'.format(self.model.current_state.name))
+        self.model.current_state.enter(self)# the machine instance has been passed in
+        
+    def callbacks(self, funcs):
+        """ Triggers a list of callbacks """
+        for func in funcs:
+            self.callback(func)
+            #_LOGGER.info("%sExecuted callback '%s'", self.name, func)
+
+    def callback(self, func):
+        """ Trigger a callback function with passed event_data parameters. In case func is a string,
+            the callable will be resolved from the passed model in event_data. This function is not intended to
+            be called directly but through state and transition callback definitions.
+        Args:
+            func (str or callable): The callback function.
+                1. First, if the func is callable, just call it
+                2. Second, we try to import string assuming it is a path to a func
+                3. Fallback to a model attribute
+            data: arguments
+        """
+        if isinstance(func, dict): # it contains the fn name as key and args as values
+            func, fn_args = fn.items()
+            func = self.resolve_callable(func)
+            func(fn_args)
+        else:   
+            func = self.resolve_callable(func)
+            func()
+        # if self.send_event:
+        #     func(event_data)
+        # else:
+        #     func(*event_data.args, **event_data.kwargs)
+
+    @staticmethod
+    def resolve_callable(func):
+        """ Converts a model's property name, method name or a path to a callable into a callable.
+            If func is not a string it will be returned unaltered.
+        Args:
+            func (str or callable): Property name, method name or a path to a callable
+        Returns:
+            callable function resolved from string or func
+        """
+        if isinstance(func, str):
+            # try:
+            #     func = getattr(event_data.model, func)
+            #     if not callable(func):  # if a property or some other not callable attribute was passed
+            #         def func_wrapper(*_, **__):  # properties cannot process parameters
+            #             return func
+            #         return func_wrapper
+            # except AttributeError:
+                try:
+                    module_name, func_name = func.rsplit('.', 1)
+                    module = __import__(module_name.split('.')[0])
+                    for submodule_name in module_name.split('.')[1:]:
+                        module = getattr(module, submodule_name)
+                    func = getattr(module, func_name)
+                except (ImportError, AttributeError, ValueError):
+                    raise AttributeError("Callable with name '%s' could neither be retrieved from the passed "
+                                         "model nor imported from a module." % func)
+        return func
+
+    async def update(self):
+        await asyncio.sleep_ms(1)
+        self.model.current_state.update(self)
+        
+    # async def run_delay_timer(self, time, sema):
+    #     async with sema:
+    #         await asyncio.sleep_ms(time)
+    #         self._run_transitions()
+        
 
 def set_global_exception():
     def handle_exception(loop, context):
@@ -389,22 +525,25 @@ def set_global_exception():
         sys.exit()
     loop = asyncio.get_event_loop()
     loop.set_exception_handler(handle_exception)
+    
+
+if __name__ == "__main__":
+    # Create the state machine
+    fsm = StateMachine(4)
+
+    async def main():
+        set_global_exception()
+        # sema = Semaphore()
+        # for time in [val['transition_time'] for val in TRANSITIONS.values()]:
+        #     asyncio.create_task(fsm.run_delay_timer(time, sema))
+        while True:
+            #print('in main...')
+            await fsm.update()
+            await asyncio.sleep(1)
 
 
-# Create the state machine
-fsm = StateMachine()
-
-
-async def main():
-    set_global_exception()
-    while True:
-        #print('in main...')
-        await fsm.update()
-        await asyncio.sleep(1)
-
-
-try:
-    asyncio.run(main())
-except:
-    fsm.delay.stop() #stop the timer
-    asyncio.new_event_loop()  # Clear retained state
+    try:
+        asyncio.run(main())
+    finally:
+        # fsm.delay.stop() #stop the timer
+        asyncio.new_event_loop()  # Clear retained state

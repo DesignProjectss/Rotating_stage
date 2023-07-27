@@ -2,14 +2,25 @@ from collections import OrderedDict
 
 STATES = OrderedDict([
             (
+                'Scene_0',
+                    
+                    {
+                        'on_enter':[],
+                        'on_exit':['curtain.Curtain.draw']
+
+                    }
+            ),
+    
+            (
+                
                 'Scene_1',
                     
                     {
-                        'on_enter':['light_fade_in', 
-                                   'light_fade_out',
-                                   'animal_sound'
-                                  ],
-                        'on_exit':['draw_curtain']
+                        'on_enter':['lamp.Lamp.fade_out',
+                                    'curtain.Curtain.draw'
+                              ],
+                        'on_exit':['lamp.Lamp.fade_in',
+                                   'curtain.Curtain.close']
 
                     }
 
@@ -19,12 +30,15 @@ STATES = OrderedDict([
                 'Scene_2',
 
                     {
-                        'on_enter':['light_fade_in', 
-                                       'light_fade_out',
-                                       'animal_sound'
-                                      ],
-                        'on_exit':['draw_curtain']
+                        'on_enter':['lamp.Lamp.fade_out',
+                                    'curtain.Curtain.draw'
+                              ],
+                        
+                        'on_exit':['lamp.Lamp.fade_in',
+                                   'curtain.Curtain.close']
+
                     }
+
 
 
             ),
@@ -33,12 +47,15 @@ STATES = OrderedDict([
                 'Scene_3',
 
                     {
-                        'on_enter':['light_fade_in', 
-                                       'light_fade_out',
-                                       'animal_sound'
-                                      ],
-                        'on_exit':['draw_curtain']
+                        'on_enter':['lamp.Lamp.fade_out',
+                                    'curtain.Curtain.draw'
+                              ],
+                        
+                        'on_exit':['lamp.Lamp.fade_in',
+                                   'curtain.Curtain.close']
+
                     }
+
 
 
             ),
@@ -47,12 +64,15 @@ STATES = OrderedDict([
                 'Scene_4',
 
                     {
-                        'on_enter':['light_fade_in', 
-                                       'light_fade_out',
-                                       'animal_sound'
-                                      ],
-                        'on_exit':['draw_curtain']
+                        'on_enter':['lamp.Lamp.fade_out',
+                                    'curtain.Curtain.draw'
+                              ],
+                        
+                        'on_exit':['lamp.Lamp.fade_in',
+                                   'curtain.Curtain.close']
+
                     }
+
 
 
             )
@@ -63,26 +83,82 @@ TRANSITIONS = OrderedDict([
             (
                 'Scene_1', 
                     {
-                        'transition_time': 5,
+                        'transition_time': 10000,
                         'prepare': [],
-                        'unless': []
-                        'before': ['draw_curtain'],
-                        'after': {'10':'flicker_light'},
-                        'condition': [{'listen_for_cues':20}], #wait for the event to happen before eventually transitioning
+                        'unless': [],
+                        'before': [],
+                        'after': {'lamp.Lamp.flicker': '10'},
+                        'conditions': [],
+                        'on_enter': [],
+                        'on_exit': []
+                        #'condition': [{'audio.listen_for_cues':20}], #wait for the event to happen before eventually transitioning: future considerations
                         
                     }
                 
             ),
     
             (
+                'Scene_3', 
+                    {
+                        'transition_time': 20000,
+                        'prepare': [],
+                        'unless': [],
+                        'before': [],
+                        'after': {'lamp.Lamp.flicker': '10'},
+                        'conditions': [],
+                        'on_enter': [],
+                        'on_exit': []
+                        
+                    }
                 
                 
             ),
     
             (
+                'Scene_2', 
+                    {
+                        'transition_time': 5000,
+                        'prepare': [],
+                        'unless': [],
+                        'before': [],
+                        'after': {'lamp.Lamp.flicker': 10},
+                        'conditions': [],
+                        'on_enter': [],
+                        'on_exit': []
+                        
+                    }
                 
                 
             ),
+            
+            (
+                'Scene_4', 
+                    {
+                        'transition_time': 10000,
+                        'prepare': [],
+                        'unless': [],
+                        'before': [],
+                        'after': {'lamp.Lamp.flicker': 10},
+                        'conditions': [],
+                        'on_enter': [],
+                        'on_exit': []
+                        
+                    }
+            ),
+            (
+                'Scene_0', 
+                    {
+                        'transition_time': 0,
+                        'prepare': [],
+                        'unless': [],
+                        'before': ['lamp.Lamp.off'],
+                        'after': {'shut_down': 10},
+                        'conditions': [],
+                        'on_enter': [],
+                        'on_exit': []
+                    }
+
+            )
 
 ])
 
