@@ -6,12 +6,11 @@ IN2 = Pin(25,Pin.OUT)
 IN3 = Pin(33,Pin.OUT)
 IN4 = Pin(32,Pin.OUT)
 
-pushButton = Pin(34, Pin.IN)
-
 pins = [IN1, IN2, IN3, IN4]
 
 class Motor:
-    def __init__(self):
+    def __init__(self, motorPins):
+        self.motor_pins = motorPins
         # 28BY7-48 motor has 2048 steps in one revolution
         self.steps_per_rev = 2048 ## i.e we take 2048 steps to rotate 360deg
 
@@ -31,8 +30,8 @@ class Motor:
             step = self.clk_sequence[next_step]
 
         if step is not None:
-            for j in range(len(pins)):
-                pins[j].value(step[j])
+            for j in range(len(self.motor_pins)):
+                self.motor_pins[j].value(step[j])
                 sleep(0.001)
 
         self.last_step_i = next_step
