@@ -1,4 +1,5 @@
 
+
 #from micropython import const
 from machine import Pin
 import sys
@@ -7,7 +8,7 @@ import uasyncio as asyncio
 import ntptime
 
 from delay_ms import Delay_ms
-
+from mycondition import myCondition
 import os
 
 from motor import Motor
@@ -193,6 +194,7 @@ class Transition(object):
         self.add_state_callback(machine, 'on_enter', self.on_enter_state)
 
         self.add_state_callback(machine, 'on_exit', self.on_exit_state)
+
 
         return True
 
@@ -397,6 +399,8 @@ class StateMachine(object):
 
         self.transition_time, self.transition = next(self.transition_generator)
 
+        self.mycond = myCondition()
+
         print(self.transition_time)
 
         print(self.transition)
@@ -434,16 +438,20 @@ class StateMachine(object):
 
     def _run_transitions(self):
         condition = self.transition.execute(self)
+        #mycond = myCondition.myboolean()
         #_LOGGER.info(f"There will be transition in: {self.transition_time}ms")
-        if condition:
+        if self.mycond.myboolean():
             try:
-
                 self.transition_time, self.transition = next(self.transition_generator)
                 print(self.transition_time)
                 print(self.transition)
                 self.delay.trigger(self.transition_time)
-            except RuntimeError:
-                self.delay.stop() # kill the machine or something
+            #except RuntimeError:
+                #pass
+                #self.delay.deinit()
+                #self.delay.stop() # kill the machine or something
+            except StopIteration:
+                self.delay= None
         else:
             self.trigger(5000) # in case the condition fails, try it again every 5 mins until it passes.
 

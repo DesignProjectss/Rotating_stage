@@ -25,6 +25,7 @@ class Delay_ms:
     class DummyTimer:  # Stand-in for the timer class. Can be cancelled.
         def cancel(self):
             pass
+
     _fake = DummyTimer()
 
     def __init__(self, func=None, args=(), duration=1000):
@@ -32,7 +33,7 @@ class Delay_ms:
         self._args = args
         self._durn = duration  # Default duration
         self._retn = None  # Return value of launched callable
-        self._tend = None  # Stop time (absolute ms).
+        self._tend = None  # Stop (absolute ms).
         self._busy = False
         self._trig = asyncio.ThreadSafeFlag()
         self._tout = asyncio.Event()  # Timeout event
