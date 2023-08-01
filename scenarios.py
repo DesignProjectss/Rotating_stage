@@ -67,7 +67,7 @@ TRANSITIONS = OrderedDict([
                         'prepare': [],
                         'unless': []
                         'before': ['draw_curtain'],
-                        'after': {'10':'flicker_light'},
+                        'after': {'10':'flicker_light'}, # should be a list - check add_callback method
                         'condition': [{'listen_for_cues':20}], #wait for the event to happen before eventually transitioning
                         
                     }
