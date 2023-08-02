@@ -255,7 +255,7 @@ class StateMachine:
 
                 self.delay.trigger(self.transition_time)
             except RuntimeError:
-                self.delay.stop() # kill the machine or something
+                self.delay = None  # kill the machine or something
         else:
             self.trigger(5000) # in case the condition fails, try it again every 5 mins until it passes.
 
