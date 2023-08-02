@@ -13,7 +13,7 @@ from scenarios import STATES, TRANSITIONS
 from motor import Motor
 
 
-class Condition(object):
+class Condition:
     """ A helper class to call condition checks in the intended way.
     Attributes:
         func (str or callable): The function to call for the condition check
@@ -50,7 +50,7 @@ class Condition(object):
 
 
 
-class Transition(object):
+class Transition:
     """ Representation of a transition managed by a ``Machine`` instance.
     Attributes:
         source (str): Source state of the transition.
@@ -174,20 +174,20 @@ class Transition(object):
     #  Check Not using thi either - confirm
     def add_state_callback(self, machine, trigger, func): # Check I don't think this is needed
         pass
-        # """ Add a new on_enter and on_exit callback.
-        # Args:
-        #     trigger (str): The type of triggering event. Must be one of
-        #         'on_exit', 'on_before'.
-        #     func (str or callable or list): The name of the callback function or a callable.
-        # """
-        # callback_list = getattr(machine.model.current_state, trigger)
+        """ Add a new on_enter and on_exit callback.
+        Args:
+            trigger (str): The type of triggering event. Must be one of
+                'on_exit', 'on_before'.
+            func (str or callable or list): The name of the callback function or a callable.
+        """
+        callback_list = getattr(machine.model.current_state, trigger)
 
-        # if isinstance(func, list):
-        #     callback_list.extend(func)
-        # elif isinstance(func, dict):
-        #     pass#turn a dictionary key to a callable with the value(s) as the argument
-        # else:
-        #     callback_list.append(func)
+        if isinstance(func, list):
+            callback_list.extend(func)
+        elif isinstance(func, dict):
+            pass#turn a dictionary key to a callable with the value(s) as the argument
+        else:
+            callback_list.append(func)
 
 
     def __repr__(self):
@@ -197,12 +197,10 @@ class Transition(object):
 
 
 #state machine class
-class StateMachine(object):
+class StateMachine:
     name = 'Platform Rotation System'
 
     transition_cls = Transition
-
-    gpios = PINS['GPIO_POOL']
 
     divisions = len(STATES)
 
@@ -222,10 +220,10 @@ class StateMachine(object):
         self.delay.trigger(self.transition_time)
 
     def create_transition(self):
-        for key in TRANSITIONS.keys():
-            trans = TRANSITIONS.get(key)
+        for key in range(len(TRANSITIONS)):
+            name, trans = TRANSITIONS[key]
 
-            state_name = key
+            state_name = name
 
             transition_time = trans['transition_time']
 
@@ -240,9 +238,10 @@ class StateMachine(object):
             on_enter = trans['on_enter']
             on_exit = trans['on_exit']
 
+            print(self.model.current_state)
             yield transition_time, self.transition_cls(self.model.current_state.name, state_name, conditions, unless, before, after, prepare, on_enter, on_exit) # how to put an obj back into the generator in the case a condition fails?  Use the queue instead
 
-    # //Check it's usage
+    # // Check it's usage
     def _run_transitions(self): # PASS
         # self.transition is the next transition we want to perform
         condition = self.transition.execute(self)
@@ -250,10 +249,10 @@ class StateMachine(object):
         if condition:
             try:
                 self.transition_time, self.transition = next(self.transition_generator)
-                
+
                 print(self.transition_time)
                 print(self.transition)
-                
+
                 self.delay.trigger(self.transition_time)
             except RuntimeError:
                 self.delay.stop() # kill the machine or something
@@ -312,36 +311,38 @@ class StateMachine(object):
 
 
 #abstract state base class
-class State(object):
-    def __init__(self, name, location):
+class State:
+    def __init__(self, name):
         self.name = name
-        self.location = location
+        self.on_enter = STATES[self.name]['on_enter'] # Check storing in multiple places - not needed
+        self.on_exit = STATES[self.name]['on_exit']
 
-    def enter(self, machine):        
+    def enter(self, machine):
         #read actions to be taken from STATE
-        for fn in STATES[self.name]['on_enter']:
+        for fn in self.on_enter:
             if isinstance(fn, dict): # it contains the fn name as key and args as values
                 fn_name, fn_args = fn.items()
-                cls_name, met_name = fn_name.split('_', 1)
-                getattr(cls_name, met_name)(fn_args) # make sure the fn takes *args and **kwargs
+                func = machine.resolve_callable(fn_name)
+                func(fn_args)
             elif isinstance(fn, str):
-                fn_name, fn_args = fn.items()
-                cls_name, met_name = fn_name.split('_', 1)
-                getattr(cls_name, met_name)() # make sure the fn takes *args and **kwargs
-        
-        
+                func = machine.resolve_callable(fn)
+                func()
+
+
 
     def exit(self, machine):
         #read actions to be taken from STATE
-        for fn in STATES[self.name]['on_exit']:
+        for fn in self.on_exit:
             if isinstance(fn, dict): # it contains the fn name as key and args as values
                 fn_name, fn_args = fn.items()
-                cls_name, met_name = fn_name.split('_', 1)
-                getattr(cls_name, met_name)(fn_args) # make sure the fn takes *args and **kwargs
+                func = machine.resolve_callable(fn_name)
+                func(fn_args)
+                # cls_name, met_name = fn_name.split('_', 1)
+                # getattr(cls_name, met_name)(fn_args) # make sure the fn takes *args and **kwargs
             elif isinstance(fn, str):
-                cls_name, met_name = fn.split('_', 1)
-                getattr(cls_name, met_name)() # make sure the fn takes *args and **kwargs
-        
+                func = machine.resolve_callable(fn)
+                func()
+
 
     def update(self, machine): #runs updates globally for all states entered
         pass
@@ -352,54 +353,73 @@ class Platform(): # PASS
 
     def __init__(self, divisions):
         self.divisions = divisions
-        self.motor = Motor()
-        self.old_state = State(name='Scene_0', location=0)
-        self.current_state = None
+        self.motor = Motor(PINS)
+        self.current_state = State(name='Scene_0')
+        self.old_state = None
         self.states = {}
-        self.locations = {2: [90, 270], 3: [45, 135, 270], 4: [45, 135, 225, 315]}
+        self.locations = [(360//int(self.divisions))*i for i in range(1,int(self.divisions)+1)]
 
-        for i in range(1, divisions+1):
-            locations = self.locations[divisions]
-            self.states[f'Scene_{i}'] = State(name=f'Scene_{i}', location=locations[i])
-                        
+        self.locations.insert(0, 0)
+
+        for i in range(0, self.divisions+1):
+            self.states[f'Scene_{i}'] = State(name=f'Scene_{i}')
+
+        if AUTOMATION:
+            import serial
+            self.platform = serial.Serial('/dev/pts/2',115200) #remember to change the port number
+
     def calibrate(self, reverse=False): # Just to set our motor to first division(state 1) facing us
         self.motor.move_one_step(reverse)
-    
+
+    def get_rotate_direction(self):
+        print("reached")
+        old_div_pos = int(self.old_state.name[-1])
+        next_div_pos = int(self.current_state.name[-1])
+
+        anti_clockwise_distance = (next_div_pos - old_div_pos) % self.divisions
+        clockwise_distance = (old_div_pos - next_div_pos) % self.divisions
+
+        reverse = anti_clockwise_distance < clockwise_distance ## reverse = True = rotate anti_clockwise
+        angle = (anti_clockwise_distance if reverse else clockwise_distance) * (360 / self.divisions)
+
+        return angle, reverse
+
+
     def rotate(self):
         try:
-            location_diff = self.current_state.location - self.old_state.location
-            if abs(location_diff) > 180: #find the shortest path for energy conservation
-                self.motor.rotate_by(location_diff, reverse=True)
-            else:
-                self.motor.rotate_by(location_diff)
-                
+            angle, reverse = self.get_rotate_direction()
+
+            print("Angle is: " + str(angle), reverse)
+            print(reverse)
+            self.motor.rotate_by(angle, reverse)
+
             # disable the motor to conserve energy
         except:
             print("An error occured in the rotate method of platform")
-    
-    def rotateCCW(self, angle):
-        if AUTOMATION:
-            data = {'angle':360//self.divisions, 'division':self.divisions, 'rotate':angle}
-            self.platform.write(f"{data}\n")
-        else:
-            self.motor.rotate_by(abs(angle), reverse=True)
 
-    def rotateCW(self, angle):
-        if AUTOMATION:
-            data = {'angle':360//self.divisions, 'division':self.divisions, 'rotate':angle}
-            self.platform.write(f"{data}\n")
-        else:
-            self.motor.rotate_by(angle)
-    
+    # def rotateCCW(self, angle):
+    #     if AUTOMATION:
+    #         data = {'angle':360//self.divisions, 'division':self.divisions, 'rotate':angle}
+    #         self.platform.write(f"{data}\n")
+    #     else:
+    #         self.motor.rotate_by(abs(angle), reverse=True)
+
+    # def rotateCW(self, angle):
+    #     if AUTOMATION:
+    #         data = {'angle':360//self.divisions, 'division':self.divisions, 'rotate':angle}
+    #         self.platform.write(f"{data}\n")
+    #     else:
+    #         self.motor.rotate_by(angle)
+
     def close_curtain():
         pass
-    
+
     def open_curtain():
         pass
-    
+
     def open_curtain_to(width):
         pass
-    
+
 def set_global_exception():
     def handle_exception(loop, context):
         import sys
