@@ -1,4 +1,3 @@
-
 #from micropython import const
 from machine import Pin
 import sys
@@ -8,9 +7,10 @@ import ntptime
 
 from delay_ms import Delay_ms
 
-from config import PINS
+from config import MOTOR_PINS, CURTAIN_PINS, STAGE_RADIUS, MOTOR_RADIUS, DIVISIONS
 from scenarios import STATES, TRANSITIONS
 from motor import Motor
+from curtain import Curtain
 
 
 class Condition:
@@ -41,6 +41,7 @@ class Condition:
     def check(self, machine):
         """ Check whether the condition passes.
         """
+        print("CHECKINGG", self.func)
         predicate = machine.resolve_callable(self.func)
 
         return predicate() == self.target
@@ -235,7 +236,7 @@ class StateMachine:
             after = trans['after']
             prepare = trans['prepare']
 
-            on_enter = trans['on_enter']
+            on_enter = trans['on_enter'] # Check --- WE're not using this again, i think it's been done in the state
             on_exit = trans['on_exit']
 
             print(self.model.current_state)
@@ -254,10 +255,10 @@ class StateMachine:
                 print(self.transition)
 
                 self.delay.trigger(self.transition_time)
-            except RuntimeError:
+            except (RuntimeError, StopIteration):
                 self.delay = None  # kill the machine or something
         else:
-            self.trigger(5000) # in case the condition fails, try it again every 5 mins until it passes.
+            self.delay.trigger(5000) # in case the condition fails, try it again every 5 mins until it passes.
 
     def go_to_state(self, state_name):
         if self.model.current_state:
@@ -326,6 +327,7 @@ class State:
                 func(fn_args)
             elif isinstance(fn, str):
                 func = machine.resolve_callable(fn)
+                print("HEYYY", fn)
                 func()
 
 
@@ -353,7 +355,8 @@ class Platform(): # PASS
 
     def __init__(self, divisions):
         self.divisions = divisions
-        self.motor = Motor(PINS)
+        self.motor = Motor(MOTOR_PINS)
+        self.curtain = Curtain(CURTAIN_PINS, divisions, stage_radius=STAGE_RADIUS, motor_radius=MOTOR_RADIUS)
         self.current_state = State(name='Scene_0')
         self.old_state = None
         self.states = {}
@@ -390,7 +393,7 @@ class Platform(): # PASS
             angle, reverse = self.get_rotate_direction()
 
             print("Angle is: " + str(angle), reverse)
-            print(reverse)
+            print("Reverse: ", reverse)
             self.motor.rotate_by(angle, reverse)
 
             # disable the motor to conserve energy
@@ -411,14 +414,17 @@ class Platform(): # PASS
     #     else:
     #         self.motor.rotate_by(angle)
 
-    def close_curtain():
-        pass
+    def close_curtain(self):
+        self.curtain.close()
+        # pass
 
-    def open_curtain():
-        pass
+    def open_curtain(self):
+        self.curtain.draw()
+        # pass
 
-    def open_curtain_to(width):
-        pass
+    def open_curtain_to(self, width, reverse=False):
+        self.curtain.open_to(width, reverse=reverse)
+        # pass
 
 def set_global_exception():
     def handle_exception(loop, context):
@@ -431,7 +437,7 @@ def set_global_exception():
 
 if __name__ == "__main__":
     # Create the state machine
-    fsm = StateMachine(4)
+    fsm = StateMachine(DIVISIONS)
 
     async def main():
         set_global_exception()

@@ -5,8 +5,9 @@ STATES = OrderedDict([
                 'Scene_0',
 
                     {
-                        'on_enter':[],
-                        'on_exit':['curtain.Curtain.draw']
+                        'on_enter':['curtain.Curtain.draw'],
+                        'on_exit':[]
+                        #'on_exit':[]
 
                     }
             ),
@@ -88,7 +89,7 @@ TRANSITIONS =[
                         'unless': [],
                         'before': [],
                         'after': {'lamp.Lamp.flicker': '10'},
-                        'conditions': [],
+                        'conditions': ['cond.Condition.get_curtain_done_state'],
                         'on_enter': [],
                         'on_exit': []
                         #'condition': [{'audio.listen_for_cues':20}], #wait for the event to happen before eventually transitioning: future considerations
@@ -105,7 +106,7 @@ TRANSITIONS =[
                         'unless': [],
                         'before': [],
                         'after': {'lamp.Lamp.flicker': '10'},
-                        'conditions': [],
+                        'conditions': ['cond.Condition.get_curtain_done_state'],
                         'on_enter': [],
                         'on_exit': []
 
@@ -122,7 +123,7 @@ TRANSITIONS =[
                         'unless': [],
                         'before': [],
                         'after': {'lamp.Lamp.flicker': 10},
-                        'conditions': [],
+                        'conditions': ['cond.Condition.get_curtain_done_state'],
                         'on_enter': [],
                         'on_exit': []
 
@@ -139,7 +140,7 @@ TRANSITIONS =[
                         'unless': [],
                         'before': [],
                         'after': {'lamp.Lamp.flicker': 10},
-                        'conditions': [],
+                        'conditions': ['cond.Condition.get_curtain_done_state'],
                         'on_enter': [],
                         'on_exit': []
 
@@ -154,7 +155,7 @@ TRANSITIONS =[
                         'unless': [],
                         'before': [],
                         'after': {'lamp.Lamp.flicker': 10},
-                        'conditions': [],
+                        'conditions': ['cond.Condition.get_curtain_done_state'],
                         'on_enter': [],
                         'on_exit': []
 
@@ -168,7 +169,7 @@ TRANSITIONS =[
                         'unless': [],
                         'before': [],
                         'after': {'lamp.Lamp.flicker': 10},
-                        'conditions': [],
+                        'conditions': ['cond.Condition.get_curtain_done_state'],
                         'on_enter': [],
                         'on_exit': []
 
@@ -182,7 +183,7 @@ TRANSITIONS =[
                         'unless': [],
                         'before': [],
                         'after': {'lamp.Lamp.flicker': 10},
-                        'conditions': [],
+                        'conditions': ['cond.Condition.get_curtain_done_state'],
                         'on_enter': [],
                         'on_exit': []
 
@@ -196,7 +197,7 @@ TRANSITIONS =[
                         'unless': [],
                         'before': ['lamp.Lamp.off'],
                         'after': {'shut_down': 10},
-                        'conditions': [],
+                        'conditions': ['cond.Condition.get_curtain_done_state'],
                         'on_enter': [],
                         'on_exit': []
                     }

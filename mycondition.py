@@ -1,5 +1,5 @@
 
-class myCondition:
+class MyCondition:
    def __init__(self):
 
        self.audio_cue= True

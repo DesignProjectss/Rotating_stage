@@ -1,29 +1,24 @@
-class Curtain():
-    def __init__():
-        pass
-
-    def close():
-        print('curtain closed...')
-
-    def draw():
-        print('curtain fully opened')
-
-    def open_to(width):
-        pass
-
-
 from math import sin, pi
 from motor import Motor
+from config import MOTOR_PINS, DIVISIONS, STAGE_RADIUS, MOTOR_RADIUS
+from cond import Condition
 
-class CurtainNew():
+class Curtain():
     #  always note the units you're working with, rad, degree, m, cm
+    motor = Motor(MOTOR_PINS)
+    angle_per_div = (2 * pi) / DIVISIONS
+    secant_length = (2 * STAGE_RADIUS) * sin(angle_per_div / 2)
+    motor_radius = MOTOR_RADIUS
+    # angle_per_cm = 90.56604
+    angle_per_cm = 90
+
     def __init__(self, motor_pins, divisions, stage_radius, motor_radius):
-        self.motor = Motor(motor_pins)
-        angle_per_div = (2 * pi) / divisions
-        self.secant_length = (2 * stage_radius) * sin(angle_per_div / 2)
-        self.motor_radius = motor_radius
-        # self.angle_per_cm = 90.56604
-        self.angle_per_cm = 90
+        # self.motor = Motor(motor_pins)
+        # angle_per_div = (2 * pi) / divisions
+        # self.secant_length = (2 * stage_radius) * sin(angle_per_div / 2)
+        # self.motor_radius = motor_radius
+        # # self.angle_per_cm = 90.56604
+        # self.angle_per_cm = 90
 
 
         #test to see if this works
@@ -34,21 +29,28 @@ class CurtainNew():
         self.angle_per_secant = (self.secant_length / motor_radius) * (180 / pi)
 
 
-    def close(self):
-        # self.motor.rotate_by(self.angle_per_secant / 2, reverse=True)
-        self.open_to(self.secant_length, reverse=True)
+    @classmethod
+    def close(cls):
+        cls.open_to(cls.secant_length, reverse=True)
         print('curtain closed...')
 
-    def draw(self):
-        # self.motor.rotate_by(self.angle_per_secant / 2)
-        self.open_to(self.secant_length)
+    @classmethod
+    def draw(cls):
+        cls.open_to(cls.secant_length)
         print('curtain fully opened')
 
-    def open_to(self, width, reverse=False):
+    @classmethod
+    def open_to(cls, width, reverse=False):
+        # Condition.change_curtain_done_state(False)
+
         print(f"{'Closing' if reverse else 'Opening'} by" + str(width))
-        angle_to_move = width * self.angle_per_cm
+        angle_to_move = width * cls.angle_per_cm
         print("Opening by angle", angle_to_move)
-        self.motor.rotate_by(angle_to_move, reverse)
+        cls.motor.rotate_by(angle_to_move, reverse)
+
+        Condition.change_curtain_done_state(True)
+
+
 
 # Suggestions by Mr Eniola
 # measure the circumference of the gear
