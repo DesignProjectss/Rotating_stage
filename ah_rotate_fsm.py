@@ -10,7 +10,7 @@ from delay_ms import Delay_ms
 from config import MOTOR_PINS, CURTAIN_PINS, STAGE_RADIUS, MOTOR_RADIUS, DIVISIONS
 from scenarios import STATES, TRANSITIONS
 from motor import Motor
-from curtain import Curtain
+# from curtain import Curtain
 
 
 class Condition:
@@ -136,8 +136,6 @@ class Transition:
             self._change_state(machine)
 
         machine.callbacks(self.after)
-
-        machine.model.rotate()
 
         self.add_state_callback(machine, 'on_enter', self.on_enter_state)
 
@@ -356,7 +354,7 @@ class Platform(): # PASS
     def __init__(self, divisions):
         self.divisions = divisions
         self.motor = Motor(MOTOR_PINS)
-        self.curtain = Curtain(CURTAIN_PINS, divisions, stage_radius=STAGE_RADIUS, motor_radius=MOTOR_RADIUS)
+        # self.curtain = Curtain(CURTAIN_PINS, divisions, stage_radius=STAGE_RADIUS, motor_radius=MOTOR_RADIUS)
         self.current_state = State(name='Scene_0')
         self.old_state = None
         self.states = {}
@@ -375,7 +373,6 @@ class Platform(): # PASS
         self.motor.move_one_step(reverse)
 
     def get_rotate_direction(self):
-        print("reached")
         old_div_pos = int(self.old_state.name[-1])
         next_div_pos = int(self.current_state.name[-1])
 
@@ -414,17 +411,17 @@ class Platform(): # PASS
     #     else:
     #         self.motor.rotate_by(angle)
 
-    def close_curtain(self):
-        self.curtain.close()
-        # pass
+    # def close_curtain(self):
+    #     self.curtain.close()
+    #     # pass
 
-    def open_curtain(self):
-        self.curtain.draw()
-        # pass
+    # def open_curtain(self):
+    #     self.curtain.draw()
+    #     # pass
 
-    def open_curtain_to(self, width, reverse=False):
-        self.curtain.open_to(width, reverse=reverse)
-        # pass
+    # def open_curtain_to(self, width, reverse=False):
+    #     self.curtain.open_to(width, reverse=reverse)
+    #     # pass
 
 def set_global_exception():
     def handle_exception(loop, context):

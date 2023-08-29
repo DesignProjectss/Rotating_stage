@@ -1,11 +1,11 @@
 from math import sin, pi
 from motor import Motor
-from config import MOTOR_PINS, DIVISIONS, STAGE_RADIUS, MOTOR_RADIUS
+from config import CURTAIN_PINS, DIVISIONS, STAGE_RADIUS, MOTOR_RADIUS
 from cond import Condition
 
 class Curtain():
     #  always note the units you're working with, rad, degree, m, cm
-    motor = Motor(MOTOR_PINS)
+    motor = Motor(CURTAIN_PINS)
     angle_per_div = (2 * pi) / DIVISIONS
     secant_length = (2 * STAGE_RADIUS) * sin(angle_per_div / 2)
     motor_radius = MOTOR_RADIUS
@@ -31,21 +31,23 @@ class Curtain():
 
     @classmethod
     def close(cls):
-        cls.open_to(cls.secant_length, reverse=True)
+        cls.open_to(cls.secant_length)
         print('curtain closed...')
 
     @classmethod
     def draw(cls):
-        cls.open_to(cls.secant_length)
+        cls.open_to(cls.secant_length, reverse=True)
         print('curtain fully opened')
 
     @classmethod
     def open_to(cls, width, reverse=False):
         # Condition.change_curtain_done_state(False)
 
-        print(f"{'Closing' if reverse else 'Opening'} by" + str(width))
+        print(f"{'Opening' if reverse else 'Closing'} by" + str(width))
+
         angle_to_move = width * cls.angle_per_cm
-        print("Opening by angle", angle_to_move)
+
+        print("Rotating by angle", angle_to_move)
         cls.motor.rotate_by(angle_to_move, reverse)
 
         Condition.change_curtain_done_state(True)

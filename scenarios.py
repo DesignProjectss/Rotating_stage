@@ -147,48 +147,48 @@ TRANSITIONS =[
                     }
             ),
 
-            (
-                'Scene_3',
-                    {
-                        'transition_time': 8000,
-                        'prepare': [],
-                        'unless': [],
-                        'before': [],
-                        'after': {'lamp.Lamp.flicker': 10},
-                        'conditions': ['cond.Condition.get_curtain_done_state'],
-                        'on_enter': [],
-                        'on_exit': []
+            # (
+            #     'Scene_3',
+            #         {
+            #             'transition_time': 8000,
+            #             'prepare': [],
+            #             'unless': [],
+            #             'before': [],
+            #             'after': {'lamp.Lamp.flicker': 10},
+            #             'conditions': ['cond.Condition.get_curtain_done_state'],
+            #             'on_enter': [],
+            #             'on_exit': []
 
-                    }
-            ),
-            (
-                'Scene_1',
-                    {
-                        'transition_time': 3000,
-                        'prepare': [],
-                        'unless': [],
-                        'before': [],
-                        'after': {'lamp.Lamp.flicker': 10},
-                        'conditions': ['cond.Condition.get_curtain_done_state'],
-                        'on_enter': [],
-                        'on_exit': []
+            #         }
+            # ),
+            # (
+            #     'Scene_1',
+            #         {
+            #             'transition_time': 3000,
+            #             'prepare': [],
+            #             'unless': [],
+            #             'before': [],
+            #             'after': {'lamp.Lamp.flicker': 10},
+            #             'conditions': ['cond.Condition.get_curtain_done_state'],
+            #             'on_enter': [],
+            #             'on_exit': []
 
-                    }
-            ),
-            (
-                'Scene_3',
-                    {
-                        'transition_time': 9000,
-                        'prepare': [],
-                        'unless': [],
-                        'before': [],
-                        'after': {'lamp.Lamp.flicker': 10},
-                        'conditions': ['cond.Condition.get_curtain_done_state'],
-                        'on_enter': [],
-                        'on_exit': []
+            #         }
+            # ),
+            # (
+            #     'Scene_3',
+            #         {
+            #             'transition_time': 9000,
+            #             'prepare': [],
+            #             'unless': [],
+            #             'before': [],
+            #             'after': {'lamp.Lamp.flicker': 10},
+            #             'conditions': ['cond.Condition.get_curtain_done_state'],
+            #             'on_enter': [],
+            #             'on_exit': []
 
-                    }
-            ),
+            #         }
+            # ),
             (
                 'Scene_0',
                     {

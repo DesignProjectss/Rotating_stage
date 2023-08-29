@@ -14,7 +14,7 @@ C_IN4 = Pin(21, Pin.OUT)
 
 CURTAIN_PINS = [C_IN1, C_IN2, C_IN3, C_IN4]
 
-STAGE_RADIUS = 8.5 # unit = cm
+STAGE_RADIUS = 9 # unit = cm
 MOTOR_RADIUS = 2 # unit = cm
 
 DIVISIONS = 4
