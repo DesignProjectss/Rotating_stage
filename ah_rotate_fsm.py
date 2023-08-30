@@ -127,6 +127,7 @@ class Transition:
 
         machine.callbacks(self.prepare)
 
+        print("EXECUTE METHOD ", self.dest, self.on_enter_state, self.on_exit_state)
         if not self._eval_conditions(machine):
             return False
 
@@ -136,6 +137,8 @@ class Transition:
             self._change_state(machine)
 
         machine.callbacks(self.after)
+
+        #machine.model.rotate()
 
         self.add_state_callback(machine, 'on_enter', self.on_enter_state)
 
@@ -264,6 +267,9 @@ class StateMachine:
             self.model.current_state.exit(self)
 
         self.model.current_state = self.model.states[state_name]
+        
+        self.model.rotate()
+        
         self.model.current_state.enter(self)# the machine instance has been passed in
 
     def callbacks(self, funcs):
@@ -318,6 +324,7 @@ class State:
 
     def enter(self, machine):
         #read actions to be taken from STATE
+        print("ENTER METHOD ", self.name, self.on_enter, self.on_exit)
         for fn in self.on_enter:
             if isinstance(fn, dict): # it contains the fn name as key and args as values
                 fn_name, fn_args = fn.items()
@@ -376,6 +383,11 @@ class Platform(): # PASS
         old_div_pos = int(self.old_state.name[-1])
         next_div_pos = int(self.current_state.name[-1])
 
+        # Hack for now - to take 1 as our state 0 -  for when we want attempt to rotate to state 0 at start and parking
+        old_div_pos = 1 if old_div_pos == 0 else old_div_pos
+        next_div_pos = 1 if next_div_pos == 0 else next_div_pos
+        
+        print("GET ROTATION ", old_div_pos, next_div_pos)
         anti_clockwise_distance = (next_div_pos - old_div_pos) % self.divisions
         clockwise_distance = (old_div_pos - next_div_pos) % self.divisions
 
@@ -389,8 +401,7 @@ class Platform(): # PASS
         try:
             angle, reverse = self.get_rotate_direction()
 
-            print("Angle is: " + str(angle), reverse)
-            print("Reverse: ", reverse)
+            print("Angle is: " + str(angle), "Reverse", reverse)
             self.motor.rotate_by(angle, reverse)
 
             # disable the motor to conserve energy

@@ -3,6 +3,7 @@ from motor import Motor
 from config import CURTAIN_PINS, DIVISIONS, STAGE_RADIUS, MOTOR_RADIUS
 from cond import Condition
 
+# Curtain, true is for open
 class Curtain():
     #  always note the units you're working with, rad, degree, m, cm
     motor = Motor(CURTAIN_PINS)
@@ -47,7 +48,7 @@ class Curtain():
 
         angle_to_move = width * cls.angle_per_cm
 
-        print("Rotating by angle", angle_to_move)
+        # print("Rotating by angle", angle_to_move)
         cls.motor.rotate_by(angle_to_move, reverse)
 
         Condition.change_curtain_done_state(True)

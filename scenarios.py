@@ -5,9 +5,8 @@ STATES = OrderedDict([
                 'Scene_0',
 
                     {
-                        'on_enter':['curtain.Curtain.draw'],
+                        'on_enter':[],
                         'on_exit':[]
-                        #'on_exit':[]
 
                     }
             ),
