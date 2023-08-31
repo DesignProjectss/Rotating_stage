@@ -252,14 +252,13 @@ class StateMachine:
             try:
                 self.transition_time, self.transition = next(self.transition_generator)
 
-                print(self.transition_time)
-                print(self.transition)
+                print("TRansition time", self.transition, self.transition_time)
 
                 self.delay.trigger(self.transition_time)
             except (RuntimeError, StopIteration):
                 self.delay = None  # kill the machine or something
         else:
-            self.delay.trigger(5000) # in case the condition fails, try it again every 5 mins until it passes.
+            self.delay.trigger(5000) # in case the condition fails, try it again every 5 secs until it passes.
 
     def go_to_state(self, state_name):
         if self.model.current_state:
@@ -267,10 +266,11 @@ class StateMachine:
             self.model.current_state.exit(self)
 
         self.model.current_state = self.model.states[state_name]
-        
+
         self.model.rotate()
-        
+
         self.model.current_state.enter(self)# the machine instance has been passed in
+
 
     def callbacks(self, funcs):
         """ Triggers a list of callbacks """
@@ -332,7 +332,6 @@ class State:
                 func(fn_args)
             elif isinstance(fn, str):
                 func = machine.resolve_callable(fn)
-                print("HEYYY", fn)
                 func()
 
 
@@ -386,7 +385,7 @@ class Platform(): # PASS
         # Hack for now - to take 1 as our state 0 -  for when we want attempt to rotate to state 0 at start and parking
         old_div_pos = 1 if old_div_pos == 0 else old_div_pos
         next_div_pos = 1 if next_div_pos == 0 else next_div_pos
-        
+
         print("GET ROTATION ", old_div_pos, next_div_pos)
         anti_clockwise_distance = (next_div_pos - old_div_pos) % self.divisions
         clockwise_distance = (old_div_pos - next_div_pos) % self.divisions
